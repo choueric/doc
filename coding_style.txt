@@ -1,0 +1,283 @@
+/*
+ * C编程风格
+ *
+ * 风格因人而异，但是为了方便相互的交流以及代码的维护性，还是推荐采用以下的编程风格。
+ * 对这种风格有好的意见可以提出。
+ *
+ * $CreatedBy: zhs $
+ * $LastChangedRevision: 6 $
+ * $LastChangedDate: 2010-12-13 20:48:31 +0800 (一, 2010-12-13) $
+ * $LastChangedBy: zhs $
+ * $URL: svn://armserver/home/arm/work/svn/doc_repos/pg_style.txt $
+ */
+ 
+一，头文件以及宏声明风格
+	1，宏定义的宏名全部用大写，如果宏名比较长，可以用下划线分隔开，使得见名即明其意。
+		exp:
+			#define IDC_TIMERCLOCK 100
+			#define LCDWIDTH 800
+			#define LCDHIGHT 600
+			#define AUTHOR "zhs"
+		当然，如果为了美观，也可以将后面的值竖直对齐；
+		要求程序中所使用的所有常量都要定义为宏，不允许直接出现在程序代码中。
+		exp:
+			SetCursorPos(LCDWIDTH, LCDHIGHT);
+			printf("%s\n", AUTHOR);
+			
+	2，头文件中不能有可执行代码，也不能有数据的定义，只能有宏、类型(typedef, struct, union, enum)，数据
+		和函数的声明。要求类型声明(结构体等)必须出现在头文件中，而不能在c文件中。
+		例如以下的代码可以包含在头文件里：      
+			#define NAMESTRING "name"  
+			typedef unsigned long WORD;
+			struct menu {
+				int flag1;
+				int flag2; 
+			};     
+			typedef struct {      
+				int x;      
+				int y;      
+			} POINT;   
+			extern Fun(void);      
+			extern int State;      
+		全局变量和函数的定义不能出现在*.h文件里。
+		例如下面的代码不能包含在头文件:
+			int a;      
+			void Fun(void) {      
+				a++;      
+			}         
+        
+	3，为了防止头文件重复包含。使用下面的宏防止一个头文件被重复包含。      
+		#ifndef MY_INCLUDE_H      
+		#define MY_INCLUDE_H      
+		<头文件内容 >      
+		#endif  
+
+二，程序块的风格
+	1，用到花括号时，只有函数定义时两个花括号各占独立的一行，其它的程序块的符号：
+			if, for, while, do-while, switch
+		要求"{"紧跟在这些符号之后，"{"则独占一行。
+        "{"之前需要一个空格隔开；"}"之后如果有内容，需要一个空格隔开。
+		if, for, while, 之后需要一个空格隔开。
+		exp:
+			int fun(int i) {
+				int retval;
+               
+				printf("the value is %d\n", i);
+				retval = i * 2;
+               
+				return 0;
+			}
+
+			for (i = 0; i < 10; i++){
+				j = fun(i);
+				printf("value is %d\n", j);
+			}
+
+			if (i == 0) {
+				printf("i is zero\n");
+				j = i;
+			} else if (i == 1) {
+				printf("i is one\n");
+				j = i+1;
+			} else if (i == 2) {
+				printf("i is two\n");
+				j = i + 2;
+			} else {
+				printf("i is other value\n");
+				j = i + 3;
+			}
+                        
+			while (i < 10) {
+				i++;
+				printf("i is %d\n", i);
+			}
+
+			switch(i) {
+				case 1:
+					printf("1\n");
+					break;
+				case 2:
+					printf("2\n");
+					break;
+				case 3:
+					printf("3\n");
+					break;
+				default:
+					printf("other num\n");
+					break;
+			}
+        
+	2，在函数定义程序块中，各不同功能的代码，比如局部变量定义，隔行分块显示出来。
+		exp:
+			int func(int i) {
+				int n;                    //块1
+				char str[] = "exp";
+               
+				if(i = 1) {                //块2
+					n = i;
+					printf("i is %d and str is %s\n", n, str);
+				} else {
+					n = i + 1;
+					printf("i is %d and str is %s\n", n, str);
+				}
+
+				n = n + 2;                //块3
+				printf("return value is %d\n", n);
+                
+				return n;                 //块4
+			}
+        
+	3，定义结构体和联合体时，"{"紧跟在类型名之后，"{"独占一行。
+		exp:
+			struct point {
+				int x;
+				int y;
+			};
+
+三，命名风格
+	1，c文件的文件名要能反映它所实现的模块功能，
+		比如list.c，同时如果有对应的h文件，其文件名应该和c文件名相同，list.h。
+
+	2，宏定义的命名如上所示。
+
+	3，模块中(即c文件)不被其他模块调用的内部函数采用以下命名规则：全部小写，能反映函数功能.
+		如果需要长函数名才能表示，则单词间采用带下划线的形式。
+		这些函数应定义为static静态函数，这样在其他模块错误地调用这些函数时编译器能给出错误。
+		exp:
+			static void lineto(void);
+			static void bitblt(HDC hdc);
+			static int draw_arrow(HDC hdc);
+		如果定义和声明其他模块调用的全局函数，函数名为每个单词的首字母大写，能反映函数功能。
+		这些函数应该在相应的头文件中用extern声明，以被其他模块调用。
+		exp:
+			extern int GetCurrentEcg(int *pdata);
+			extern int ReceivePluseRate(unsigned int data);
+
+	4，模块内部、不被其他模块调用的全局变量，变量名全部小写，能反映变量名所代表含义，
+		如果需要长变量名，则单词间使用下划线，并用static修饰。
+		exp:
+			static int flagalarm;
+			static char style[20];
+                     
+		定义或声明被其他模块调用的全局变量，变量名每个单词首字母大写，能够反映变量所代表含义，
+		在头文件中用extern修饰。
+		exp:
+			extern int IsVpc;
+			extern int VpcState;
+		程序块内部的局部变量（比如函数内）以及函数的参数声明，其变量名要求言简意赅、简洁短小，全部小写。
+		exp:
+        
+			void func(int data, int *retval) {
+				int i, n;
+                                
+				/* code */
+			}
+       
+	5，自定义类型变量的类型名，比如结构体、枚举变量，本名全部小写，而使用typedef后的类型名全部大写。
+		exp:
+			typedef struct time_node {
+				int hour;
+				int min;
+				int sec;
+			} TIMENODE;
+
+四，缩进风格
+	1，良好的缩进风格和排版让人看代码不烦躁，有效提高代码的可维护性。
+		关于缩进风格推荐使用Vim的自动缩进格式，具体如何参看这篇文档中的代码缩进以及用用Vim就知道了。
+		另外，Vim中默认使用的缩进格式为：tab缩进，并且tab宽度为8。按照一般的要求是宽度应该设置为4，
+		而使用tab还是空格作为缩进则是各有优点。
+		这里统一缩进使用tab，宽度为4。
+		对Vim的配置文件~/.vimrc中添加以下代码可以将Vim配置成符合以上要求的缩进。更多选项参看Vim的help。
+			" tab的空格数目
+			set tabstop=4
+			" 自动缩进的宽度
+			set shiftwidth=4
+		配置文件中其他的和缩进相关的配置就不需要了，以免覆盖以上设置。
+        
+	2，变量以及符号之间的间隔。要求","之后一空格，for的头语句中";"后一空格。
+		"=" "<=" "<" ">=" ">" "==" "+=" "-=" "||" "&&" "&" "|" "!=" 两边各一空格。
+		exp:
+			for (i = 0; i < 10; i++) {
+				static int n;
+                                
+				if (i < 5 && i > 3)
+					printf("a\n");
+				else if (i > 6 || i < 3)
+					printf("b\n");
+				else 
+					print("c\n");
+                   
+				n += i;
+				if (n == 9)
+					printf("d\n");
+                   
+			}
+		如果为了其他效果，比如防止优先级的错误，可以适当进行空格隔离。
+		exp:
+			c = a + ++b;
+			c = a++ + b;
+			a =- 1;
+			a = -1;
+        
+五，注释风格
+	1，变量名注释。如果按照以上的命名风格来给变量命名的话，一般不需要添加注释，
+		如果需要，则添加在变量声明或定义的但前行、定义或声明之后。
+		exp:
+			extern int IsReal;  //是否为真，0 = 假，!0 = 真
+			int state; //表示状态
+		如果为了排版美观，可以将"//"调整至同一列。
+        
+	2，函数注释。为了不同模块编写者之间的接口调用清晰以及代码的维护性，函数的定义和声明要求有详尽的注释说明。
+		exp:
+			/*
+			 * 函数原型：void TimeShowStyle(char *pstyle);
+			 * 功   能：char *pstyle传来的参数，将字符串的内容拷贝到char *pstyle
+			 *         返回的值的格式为"Sun Jan 13 15:14:13 1998\n\0"，
+			 *         所以printf("%s", pstyle)不用加'\n'
+			 * 参   数：pstayle，字符串指针，保存结果，pstyle指针应该指向有大于等于26个字符空间
+			 * 返 回 值：void
+			 * zhs
+			 */
+			void TimeShowStyle(char *pstyle)
+			{
+				time_t ptime;
+                
+				time(&ptime);
+				strcpy(pstyle, ctime(&ptime));
+			}
+		函数原型：说明了函数的声明原型；
+		功能：说明了该函数所实现的功能，说明应该详尽；
+		参数：说明了函数所传递的参数表，其中各个参数的含义以及用处；
+		返回值：说明了函数所返回的值以及返回值所代表的含义，比如返回值为出错信息，每个值的具体错误含义；
+		编写者：写这个函数的人；
+		时间：不做要求，但能写最好。
+        
+	3，代码中未完成、需添加以及以后仍要注意的地方，在注释中用/*TODO:reason*/标记。
+		做为测试用或者debug用的语句或者程序用/*test*/标记。
+        
+	4，在代码块中的注释，不要求太多，能不写就尽量不写，好的代码自己能解释自己。
+		但关键、重要处以及比较“玄”的地方需要注释。
+
+六，复杂度控制。
+	1，每个函数的规模应该尽量小，每个函数专注于完成特定的一个功能。每个函数应该写成小函数，行数不超过一屏(70行)。
+	2，对于出现的大量重复的代码，完全可以提取出来称为一个参数。重复代码的出现是不好的。当你发现你在复制、粘帖一段代码时，停止吧，将这段代码写成函数。
+/********** end ***********/
+
+TODO:/**/每个模块或者c文件导出的全局函数（可能包括变量）的名称的头几个字母可以为所在模块或者源文件的文件名缩写，推荐为三个字母，在以下划线隔开：
+        exp：mai_GlobalFunction();
+             wav_DrawArraw();
+     /**/没有说函数的参数的命名风格.        
+     /**/关于函数返回值的风格，根据内核的习惯来说，返回负数是错误的表现，有系统的错误宏参考。
+     /**/为了程序的可读性牺牲一些程序的效率常常是值得的。但是关键代码的地方就不能这么做了。
+     /**/编写程序是，可以采用一些能适应变更的设计以便将来对程序的修改更容易一些。通常使用宏定义机制进行集中编辑修改
+     /**/一个C文件开头，最好有一段注释，表示这个C文件的名称，描述程序操作信息，文件中特别复杂的部分说明，可能的使用者（指调用这个文件的其他文件）.
+     /**/为函数写的最有用的注释之一就是给出一个函数是如何被使用的实例
+     /**/函数返回值有两种风格：1)0为成功，其它为错误代码；2)0为失败，非零为成功。一个程序里面只能有一种返回值风格。或者区分动作函数以及判断函数区别
+	     采用这两种风格，动作函数用1)，判断函数用2)
+     /**/在内核编程中，一些基本的宏定义在include/linux/kernel.h中有，看看，有很多实用宏工具。
+     /**/不要在函数内部创建大部头的局部变量，会造成栈溢出
+     /**/使用if-else来判断错误时，可以先if (err){ ...; exit(1);，而不要用if (right){ ... } else { ...; exit(1)};
+     /**/malloc之后、全局变量定义时一定要初始化。
+     /**/使用snprintf代替sprintf
+     /**/使用memmove代替memcpy
+     /**/注意函数的可重入性，特别是模块的接口函数。
