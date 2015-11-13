@@ -1,0 +1,845 @@
+/*
+ * 大致翻译CUnit网站上的《Documentation》里的《CUnit Users Guide》文档
+ * 文档位于：http://cunit.sourceforge.net/doc/index.html
+ * 官网为：http://cunit.sourceforge.net
+ * CUnit的版本为：CUnit-2.1-2-src.tar, Release Date: 2010-10-17 
+ * 
+ * 2010年11月18日 星期四 17时24分38秒
+ * zhs
+ */
+
+Index:
+- 1. Introduction
+  - 1.1. Description
+  - 1.2. Structure
+  - 1.3. General Usage
+  - 1.4. Changes to the CUnit API in Version 2
+- 2. Writing CUnit Tests
+  - 2.1. Test Functions
+  - 2.2. CUnit Assertions
+  - 2.3. Deprecated v1 Assertions
+- 3. The Test Registry
+  - 3.1. Synopsis
+  - 3.2. Internal Structure
+  - 3.3. Initialization
+  - 3.4. Cleanup
+  - 3.5. Other Registry Functions
+  - 3.6. Deprecated v1 Data Tyeps & Functions
+- 4. Managing Tests & Suites
+  - 4.1. Synopsis
+  - 4.2. Adding Suites to the Registry
+  - 4.3. Adding Tests to Suites
+  - 4.4. Shortcut Methds for Managing Tests
+  - 4.5. Deprecated v1 Data Types & Functions
+- 5. Running Tests
+  - 5.1. Synopsis
+  - 5.2. Running Tests in CUnit
+  - 5.3. Automated Mode
+  - 5.4. Basic Mode
+  - 5.5. Interactive Console Mode
+  - 5.6. Interactive Curses Mode
+  - 5.7. Getting Test Results
+  - 5.8. Deprecated v1 Data Types & Functions
+- 6. Error Handing
+  - 6.1. Synopsis
+  - 6.2. CUnit Error Handing
+  - 6.3. CUnit Behavior on Framework Errors
+  - 6.4. Deprecated v1 Variables & Functions
+
+------------------------------------------------------------------------------
+- 1. Introduction to Unit Testing with CUnit
+  - 1.1. Description
+    CUnit是一个使用C来编写、管理以及运行单元测试的系统。它被构建成一个静态库，
+	并被连接到使用者的测试代码。
+
+	CUnit使用一个简单的框架来构建测试结构， 并且提供了一个丰富的断言集用以测试
+	一般的数据类型。另外，还提供了一些不同的接口来运行测试和报告结果。这些接口
+	包括用于由代码控制的测试和报告的所谓的自动式接口，以及允许使用者动态地运行
+	测试和查看结果的交互式接口。
+
+	下面列出的头文件声明了对典型使用者非常有用的数据类型和函数：
+	--------------------------------------------------------------------------
+	Header File                      Description
+    <CUnit/Cunit.h>       用于测试用例(test case)ASSERT宏， 并包括其他的架构头
+	                      文件。
+    <CUnit/CUError.h>     用于处理错误的函数和数据类型。自动被CUnit.h包含。
+	<CUnit/TestDB.h>      定义了用于test registry, suite和test的数据结构和操作
+	                      函数。自动被CUnit.h包含。
+	<CUnit/TestRun.h>     定义了用于运行测试和获取测试结果的数据类型和函数。自
+	                      动被CUnit.h包含。
+	<CUnit/Automated.h>   输出xml格式结果的自动式接口(Automated interface)。
+	<CUnit/Basic.h>       无交互、输出为标准输出的基本接口(basic interface)。
+	<CUnit/Console.h>     交互式的控制台接口。
+	<CUnit/CUCurses.h>    交互式的控制台接口(使用curses库，只用于*nix系统)。
+	<CUnit/Win.h>         Windows下的接口(还没有实现)。
+
+  - 1.2. Structure
+    CUnit是一个拥有多个用户接口、平台无关的一个组合体。 其核心框架提供了对管理
+	test registry, suite和test case的支持。 而用户接口则使得使用者能够和该框架
+	进行交互以运行测试和查看测试结果。
+
+	CUnit像一个通常的单元测试框架那样组织：
+
+                      Test Registry
+                            |
+             ------------------------------
+             |                            |
+          Suite '1'      . . . .       Suite 'N'
+             |                            |
+       ---------------             ---------------
+       |             |             |             |
+    Test '11' ... Test '1M'     Test 'N1' ... Test 'NM'
+
+	单个的test case打包成一个个suite，suite则被注册到当前活动的test registry。
+	每个suite可以有setup函数和teardown函数， 在每个suite下的test执行前后自动被
+	调用。一个registry中所有的suite/test可以通过单个函数调用被运行，也可以被选
+	择地运行。
+
+	/* zhs comment start */
+    * 一次测试（Test Registry）可以运行多个测试包（Test Suite）
+    * 每个测试包（Test Suite）可以包括多个测试用例（Test Case）
+    * 每个测试用例（Test Case）又包含一个或者多个断言类的语句（assert）
+	  一个测试用例为一个测试函数，函数中调用多个断言。
+	/* zhs comment end */
+
+  - 1.3. General Usage
+    一个典型的使用CUnit框架的步骤是：
+	1. 编写用于测试的函数(如果有必要的话还包括suite的init/cleanup函数)。
+	2. 初始化test registry - CU_initialize_registry()。
+	3. 添加suite到test registry中 - CU_add_suite()。
+	4. 添加test到suite中 - CU_add_test()
+	5. 使用恰当的接口运行测试，例如CU_console_run_tests()。
+	6. 清除test registry - CU_cleanup_registry()。
+
+  - 1.4. Changes to the CUnit API in Version 2
+    CUnit中所有的共用命名现在都加上了"CU_"前缀，有助于减少和使用者代码中的命名
+	冲突。注意，早前的CUnit版本中使用了没有该前缀命名。旧的API命名不被推荐，但
+	是仍然支持。为了使用旧的命名，用户代码必须使用USE_DEPRECATED_CUNIT_NAMES宏
+	来进行编译。
+
+	不被推荐的API函数在本文档中的特定(Deprecated)章节中说明。
+
+------------------------------------------------------------------------------
+- 2. Writing CUnit Tests
+  - 2.1. Test Functions
+    CUnit中的一个test是拥有如下形式(signature?)的C函数：
+
+	  void test_func(void)
+
+	对于测试函数在内容上是没有什么限制的，除了它不能修改CUnit本身的框架(例如添
+	加suite或test，修改test  registry，或者启动一次测试)。一个测试函数可以调用
+	其他函数(那些不会修改框架的)。注册一个test意味着该test的函数会在这个test运
+	行时被调用。
+
+	对于返回两个整型数中较大者的例程的一个测试函数可能如下所示：
+	  
+	  int maxi(int i1, int i2)
+	  {
+		  return (i1 > i2) ? i1 : i2;
+	  }
+
+      void test_maxi(void)
+      {
+		  CU_ASSERT(maxi(0, 2) == 2);
+		  CU_ASSERT(maxi(0, -2) == 0);
+		  CU_ASSERT(maxi(2, 2) == 2);
+	  }
+
+  - 2.2. CUnit Assertions
+    CUnit提供了一套断言来测试逻辑条件。 这些断言的成功或者失败会被框架所跟踪，
+	并且在一个test运行完成之后进行查看。
+
+	每个断言测试一个逻辑条件，并且在条件等于FALSE时失败。 当失败时，除非使用者
+	选择了断言的'xxx_FATAL'版本，测试函数会中断并立即返回， 否则测试函数会继续
+	运行。注意，断言的FATAL版本应当被小心使用！一旦一个FATAL断言失败的话，测试
+	函数是没有机会进行它自身的clean up工作。然后suite的cleanup函数则不会受到影
+	响。
+	/* zhs comment start */
+	断言失败表示断言的条件为假，而断言错误表示代码执行发生了异常。
+	貌似断言如果失败的话，还会继续进行测试。当然如果是FATAL的断言失败则不会。
+	而且貌似也没有自定义断言的机制。
+	/* zhs comment end */
+
+	存在着一些特殊的断言，用来在没有逻辑测试时给框架注册一个pass或者fail。这在
+	测试控制流或者不需要逻辑测试的情况时很有用：
+	/* zhs comment start */
+	这两个断言，特别是CU_PASS，可以用来表示预期会到达这个地方， 并且能作为一个
+	统计目的使用，同时也能明确表示目的，起到文档的作用。
+	/* zhs comment end */
+
+	  void test_longjmp(void)
+	  {
+		  jmp_buf buf;
+		  int i;
+
+		  i = setjmp(buf);
+		  if(i == 0){
+			  run_other_func();
+			  CU_PASS("run_other_func() succeeded.");
+		  } else
+			  CU_FAIL("run_other_func() issued longjmp.");
+	  }
+
+    被一个注册了的测试函数调用的其他函数也能够自由的使用断言。这些断言被算入到
+	调用函数中。甚至也可以使用FATAL版的断言， 如果失败的话将会中断原来的测试函
+	数以及它的整个调用链。
+
+	有CUnit定义的断言如下：
+
+    #include <CUnit/CUnit.h>
+	--------------------------------------------------------------------------
+	CU_ASSERT(int expression)                      断言expression是TRUE(非0)
+	CU_ASSERT_FATAL(int expression)  
+	CU_TEST(int expression)
+	CU_TEST_FATAL(int expression)
+	--------------------------------------------------------------------------
+	CU_ASSERT_TRUE(value)                          断言value是TRUE(非0)
+	CU_ASSERT_TURE_FATAL(value)
+	--------------------------------------------------------------------------
+	CU_ASSERT_FALSE(value)                         断言value是FALSE(0)
+	CU_ASSERT_FALSE_FATAL(value)
+	--------------------------------------------------------------------------
+	CU_ASSERT_EQUAL(actual, expected)              断言 actual == expected
+	CU_ASSERT_EQUAL_FATAL(actual, expected)
+	--------------------------------------------------------------------------
+	CU_ASSERT_NOT_EQUAL(actual, expected)          断言 actual != expected
+	CU_ASSERT_NOT_EQUAL_FATAL(actual, expected)
+	--------------------------------------------------------------------------
+	CU_ASSERT_PTR_EQUAL(actual, expected)          断言指针 acutal == expected
+	CU_ASSERT_PTR_EQUAL_FATAL(actual, expected)
+	--------------------------------------------------------------------------
+	CU_ASSERT_PTR_NOT_EQUAL(actual, expected)      断言指针 acutal != expected
+	CU_ASSERT_PTR_NOT_EQUAL_FATAL(actual, expected)
+	--------------------------------------------------------------------------
+	CU_ASSERT_PTR_NULL(value)                      断言指针 value == NULL
+	CU_ASSERT_PTR_NULL_FATAL(value)
+	--------------------------------------------------------------------------
+	CU_ASSERT_PTR_NOT_NULL(value)                  断言指针 value != NULL
+	CU_ASSERT_PTR_NOT_NULL_FATAL(value)
+	--------------------------------------------------------------------------
+	CU_ASSERT_STRING_EQUAL(actual, expected)       断言字符串 actual和expected
+	CU_ASSERT_STRING_EQUAL_FATAL(actual, expected)                        相同
+	--------------------------------------------------------------------------
+	CU_ASSERT_STRING_NOT_EQUAL(actual, expected)   断言字符串 actual和expected
+	CU_ASSERT_STRING_NOT_EQUAL_FATAL(actual, expected)                  不相同
+	--------------------------------------------------------------------------
+	CU_ASSERT_NSTRING_EQUAL(actual, expected, count)
+	CU_ASSERT_NSTRING_EQUAL_FATAL(actual, expected, count)
+	断言actual和expected的前count个字符相同。
+	--------------------------------------------------------------------------
+	CU_ASSERT_NSTRING_NOT_EQUAL(actual, expected, count)
+	CU_ASSERT_NSTRING_NOT_EQUAL_FATAL(actual, expected, count)
+	断言actual和expected的前count个字符是不同的。
+	--------------------------------------------------------------------------
+	CU_ASSERT_DOUBLE_EQUAL(actual, expected, granularity)
+	CU_ASSERT_DOUBLE_EQUAL_FATAL(actual, expected, granularity)
+	断言|actual-expeted| <= |granularity|，使用该断言必须链接math库(-lm)
+	--------------------------------------------------------------------------
+	CU_ASSERT_DOUBLE_NOT_EQUAL(actual, expected, granularity)
+	CU_ASSERT_DOUBLE_NOT_EQUAL_FATAL(actual, expected, granularity)
+	断言|actual-expeted| > |granularity|，使用该断言必须链接math库(-lm)
+	--------------------------------------------------------------------------
+	CU_PASS(message)          用特定message注册一个passing断言，不需要逻辑测试
+	--------------------------------------------------------------------------
+	CU_FAIL(message)          用特定message注册一个failed断言，不需要逻辑测试
+	CU_FAIL_FATAL(message)
+	--------------------------------------------------------------------------
+
+  - 2.3. Deprecated v1 Assertions
+    如下断言是版本2不推荐的。要使用断言， 代码必须用USE_DEPRECATED_CUNIT_NAMES
+	宏一起编译。注意，这些断言的行为和版本1里的一样(即当失败时执行'return')。
+
+    #include <CUnit/CUnit.h>
+	--------------------------------------------------------------------------
+	Deprecated Name                   Equivalent New Name
+	ASSERT                            CU_ASSERT_FATAL
+	ASSERT_TRUE                       CU_ASSERT_TRUE_FATAL
+	ASSERT_FALSE                      CU_ASSERT_FALSE_FATAL
+	ASSERT_EQUAL                      CU_ASSERT_EQUAL_FATAL
+	ASSERT_NOT_EQUAL                  CU_ASSERT_NOT_EQUAL_FATAL
+	ASSERT_PTR_EQUAL                  CU_ASSERT_PTR_EQUAL_FATAL
+	ASSERT_PTR_NOT_EQUAL              CU_ASSERT_PTR_NOT_EQUAL_FATAL
+	ASSERT_PTR_NULL                   CU_ASSERT_PTR_NULL_FATAL
+	ASSERT_PTR_NOT_NULL               CU_ASSERT_PTR_NOT_NULL_FATAL
+	ASSERT_STRING_EQUAL               CU_ASSERT_STRING_EQUAL_FATAL
+	ASSERT_STRING_NOT_EQUAL           CU_ASSERT_STRING_NOT_EQAUL_FATAL
+	ASSERT_NSTRING_EQUAL              CU_ASSERT_NSTRING_EQUAL_FATAL
+	ASSERT_NSTRING_NOT_EQAUL          CU_ASSERT_NSTRING_NOT_EQUAL_FATAL
+	ASSERT_DOUBLE_EQUAL               CU_ASSERT_DOUBLE_EQUAL_FATAL
+	ASSERT_DOUBLE_NOT_EQUAL           CU_ASSERT_DOUBLE_NOT_EQUAL_FATAL
+
+------------------------------------------------------------------------------
+- 3. The Test Registry
+  - 3.1. Synopsis
+    #include <CUnit/TestDB.h> (自动被<CUnit/CUnit.h>包含)
+    
+    typedef struct CU_TestRegistry
+	typedef CU_TestRegistry* CU_pTestRegistry
+	
+	CU_ErrorCode     CU_initialize_registry(void);
+	void             CU_cleanup_registry(void);
+	CU_pTestRegistry CU_get_registry(void);
+	CU_pTestRegistry CU_set_registry(CU_pTestRegistry pTestRegistry);
+	CU_pTestRegistry CU_create_new_registry(void);
+	void             CU_destroy_existing_registry(CU_pTestRegistry* ppRegistry);
+
+  - 3.2. Internal Structure
+    test registry是suite以及对应的test的一个仓库。 CUnit维护一个活动(active)的
+	test registry，当使用者添加一个suite或者test时，该registry则被更新。当使用
+	者选择运行所有测试时，活动registry中的suite会被运行。
+
+	CUnit中的registry是声明在<CUnit/TestDB.h>中的一个数据结构CU_TestRegistry。
+	它包含的成员包括存储在该registry中的 suite数目、test数目以及指向已经注册的
+	suite链表头的指针。
+
+	  typedef struct CU_TestRegistry
+      {
+		  unsigned int uiNumberOfSuites;
+		  unsigned int uiNumberOfTests;
+		  CU_pSuite    pSuite;
+	  } CU_TestRegistry;
+
+      typedef CU_TestRegistry* CU_pTestRegistry;
+
+	使用者通常只在使用前和清理之后初始化registry。但是仍然提供了其他函数来操作
+	registry。
+
+  - 3.3 Initialization
+    - CU_ErrorCode CU_initialize_registry(void)
+
+	  CUnit中活动registry必须在使用前进行初始化。使用者调用任何其他CUnit函数之
+	  前必须使用CU_initialize_registry()。否则可能会造成程序崩溃。
+
+	  返回的错误状态代码为：
+	    CUE_SUCCESS    初始化成功
+	    CUE_NOMEMORY   内存分配失败
+
+  - 3.4. Cleanup
+    - void CU_cleanup_registry(void)
+
+	  当测试完成，使用者应当调用该函数来清理和释放掉框架所使用的内存。这个应当
+	  是最后被调用的CUnit函数(除了用于重置registry的CU_initialize_registry()或
+	  CU_set_registry())。
+
+	  如果调用CU_cleanup_registry()失败，会造成内存泄漏。 它可以被调用多次而不
+	  会产生错误。 注意，该函数会销毁调用registry中的所有suite以及对应的test。
+	  在清理了registry之后，指向注册suite和test的指针就不应该再被使用了。
+
+	  调用CU_cleanup_registry()只是影响到由CUnit框架维护的内部CU_TestRegisty。
+	  而析构其余的由使用者维护的registry则是使用者自己的责任。这个工作可以显式
+      地调用 CU_destroy_existing_registry()或者隐式地调用CU_set_registry()激活
+	  registy然后再次调用CU_cleanup_registry()完成。
+
+  - 3.5. Other Registry Functions
+    CUnit还提供了一些主要用于内部或调试用的函数。 但是一般的使用者也可以使用，
+	因此应该知道这些函数。包括：
+
+	- CU_pTestRegistry CU_get_registry(void)
+	  返回当前活动registry的指针。registry是数据类型CU_TestRegistry的变量。 不
+	  建议对内部test registry进行直接操作，而应当使用API函数。测试框架内部维护
+	  着registry的所有，因此返回的指针对CU_cleanup_registry()或CU_initialize_-
+	  registry()是无效的(??)。
+
+    - CU_pTestRegistry CU_set_registry(CU_pTestRegistry pTestRegistry)
+	  用指定的registry代替当前活动registry。指向先前的registry的指针被返回。使
+	  用者应该负责销毁掉旧的registry。可以通过显式地对返回的指针调用CU_destro-
+	  y_existing_registry()完成。或者通过使用CU_set_registry()激活registry，然
+	  后调用CU_cleanup_registry()隐式地销毁。 注意，不要去显式地销毁一个被设置
+	  为活动的registry。这会造成对同一内存的多次释放，并可能导致崩溃。
+
+    - CU_pTestRegistry CU_create_new_registry(void)
+	  创建一个新的registry并返回它的指针。 这个新的registry不会包含任何的suite
+	  或test。使用者应该负责销毁这个新的registry，方法前面已经描述过了。
+
+	- void CU_destroy_existing_registry(CU_pTestRegistry* ppRegistry)
+	  销毁和释放指定test registry的所有内存，包括注册的suite和test。该函数不应
+	  该对被设置成活动的registry调用(例如，由CU_get_registry()返回的指针)。 这
+	  可能在CU_cleanup_registry()被调用时导致同一内存的多次释放。 传NULL给该函
+	  数不会产生任何效果。
+
+  - 3.6. Deprecated v1 Data Types & Functions
+    下面的数据类型和函数是版本2不推荐的。 必须使用USE_DEPRECATED_CUNIT_NAMES宏
+	进行编译才能使用。
+
+    #include <CUnit/TestDB.h> (被CUnit/CUnit.h自动包含)
+	--------------------------------------------------------------------------
+	Deprecated Name                  Equivalent New Name
+	_TestRegistry                    CU_TestRegistry
+	_TestRegistry.uiNumberOfGroups   CU_TestRegistry.uiNumberOfSuites
+	PTestRegistry->uiNumberOfGroups  CU_pTestRegistry->uiNumberOfSuites
+	_TestRegistry.pGroup             CU_TestRegistry.pSuite
+	PTestRegistry->pGroup            CU_pTestRegistry->pSuite
+	PTestRegistry                    CU_pTestRegistry
+	initialize_registry()            CU_initialize_registry()
+	cleanup_registry()               CU_cleanup_registry()
+	get_registry()                   CU_get_registry()
+	set_registry()                   CU_set_registry()
+
+------------------------------------------------------------------------------
+- 4. Managing Tests & Suites
+  为了利用CUnit运行一个test测试，必须将该test添加到一个被注册到test registry中
+  的测试套件/测试包(suite)中。
+
+  - 4.1. Synopsis
+    #include <CUnit/TestDB.h>  (自动被<CUnit/CUnit.h>包含)
+
+    typedef struct CU_Suite
+	typedef CU_Suite* CU_pSuite
+
+	typedef struct CU_Test
+	typedef CU_Test* CU_pTest
+
+	typedef void (*CU_TestFunc)(void)
+	typedef int  (*CU_InitializeFunc)(void)
+	typedef int  (*CU_CleanupFunc)(void)
+
+	CU_pSuite CU_add_suite(const char* strName,
+			               CU_InitializeFunc pInit,
+						   CU_CleanupFunc pClean);
+
+    CU_pTest  CU_add_test(CU_pSuite pSuite,
+			              const char* strName,
+						  CU_TestFunc pTestFunc);
+  
+    typedef struct CU_TestInfo
+	typedef struct CU_SuiteInfo
+
+	CU_ErrorCode CU_register_suites(CU_SuiteInfo suite_info[]);
+	CU_ErrorCode CU_register_nsuites(int suite_count, ...);
+
+  - 4.2. Adding Suites to the Registry
+    - CU_pSuite CU_add_suite(const char* strName, CU_InitializeFunc pInit, 
+			                 CU_CleanupFunc pClean)
+
+	  由指定的名字、初始化函数和清理函数创建一个新的测试集合(suite)。 这个新的
+	  suite被注册到当前活动的测试registry(即被registry所有)， 因此在添加任何的
+	  suites之前，registry必须被初始化。 目前的实现不支持独立于test registry的
+	  的suite创建。
+
+	  /* zhs comment start */
+	  貌似只有suite配有setup()和cleanup()，而对于每个test没有这种机制。
+	  /* zhs comment end */
+
+	  该suite的名字必须在该registry中所有suite中唯一的。初始化函数和清理函数是
+	  可选项，作为函数指针传递， 并且在运行该suite内的测试之前和之后被调用。这
+	  使得suite能够建立和清除用于运行测试的临时结构。 这些函数没有参数，并且在
+	  调用成功后返回0，否则返回非0。 如果一个suite不需要这些函数，则传递NULL给
+	  函数CU_add_suite()。
+
+	  指向新的suite的指针被返回，该指针用以以后添加test到该suite。如果函数产生
+	  错误，则返回NULL，并且框架的错误代码被设置成如下中的一个：
+	    
+	    CUE_SUCCESS        suite创建成功
+		CUE_NOREGISTRY     registry没有被初始化
+		CUE_NO_SUITENAME   strName为NULL
+		CUE_DUP_SUITE      suite的名字不是唯一的
+		CUE_NOMEMORY       内存分配失败
+
+  - 4.3. Adding Tests to Suites
+    - CU_pTest CU_add_test(CU_pSuite pSuite, const char* strName, 
+			               CU_TestFunc pTestFunc)
+
+	  由指定的名字和测试函数创建一个新的test，并注册添加到指定的suite中。suite
+	  必须为使用CU_add_suite()已经创建了的。目前的实现不支持独立于一个已注册的
+	  suite而创建一个test。
+
+	  test的名字在被添加到的单个suite中所有test的名字中必须唯一。 测试函数不能
+	  为NULL，该参数指向的函数在该test被运行时调用。测试函数没有参数也没有返回
+	  值。
+
+	  新test的指针被返回。如果创建过程中出现错误，则返回NULL，并且框架的错误代
+	  码被设置为如下中的一个：
+
+	    CUE_SUCCESS        test创建成功
+		CUE_NOSUITE        指定的suite为空或者是非法的
+		CUE_NO_TESTNAME    strName为NULL
+		CUE_NO_TEST        pTestFunc为NULL或非法
+		CUE_DUP_TEST       test的名字不是唯一的
+		CUE_NOMEMORY       内存分配失败
+
+  - 4.4. Shortcut Methods for Managing Tests
+    - #define CU_ADD_TEST(suite, test) (CU_add_test(suite, #test, (CU_TestFUnc)test))
+
+      该宏基于测试函数函数名自动地产生一个唯一的test名字，并且将test添加到指定
+	  的suite。使用者应当检查返回值以确定是否添加成功
+
+	- CU_ErrorCode CU_register_suites(CU_SuiteInfo suite_info[])
+	  CU_ErrorCode CU_register_nsuites(int suite_count, ...)
+
+	  对于拥有众多test和suite的大型测试结构， 管理test/suite的连接和注册是枯燥
+	  和容易出错的。CUnit提供了一个特殊的注册系统来帮助管理suite和test。它主要
+	  的好处就是集中管理了suite以及对应的test的注册， 以及减少了使用者需要编写
+	  的检查错误代码的数量。
+
+	  首先test case被打包到一个CU_TestInfo类型数组中(定义在<CUnit/TestDB.h>)：
+
+	    CU_TestInfo test_arrya1[] = {
+			{"testname1", test_func1},
+			{"testname2", test_func2},
+			{"testname3", test_func3},
+			CU_TEST_INFO_NULL,
+		};
+
+      每个数组元素都包含了一个test case里(唯一的)名字以及测试函数。 数组必须以
+	  一个NULL值元素结尾，通常是使用宏CU_TEST_INFO_NULL。包含在这个CU_TestInfo
+	  数组的所有test case组成了一个test集合，该集合将会被注册到一个suite里。
+
+	  suite的信息在一个或多个CU_SuieInfo类型数组中定义(<CUnit/TestDB.h>)：
+
+	    CU_SuiteInfo suites[] = {
+			{"suitename1", suite1_init_func, suite1_cleanup_func, test_array1},
+			{"suitename2", suite2_init_func, suite2_cleanup_func, test_array2},
+			CU_SUITE_INFO_NULL,
+		};
+
+      该数组的每个元素包含一个(唯一的)名字、suite初始化函数、 清理函数以及一个
+	  该suite的CU_TestInfo数组。 同样的，如果该suite不需要初始化函数和清理函数
+	  的话，那么相应的设置为NULL即可。该数组必须以一个全NULL的元素结尾，这里使
+	  用CU_SUITE_INFO_NULL宏即可。
+
+	  接下来，所有定义成CU_SuiteInfo数组的suite可以通过一个语句进行注册：
+
+	    CU_ErrorCode error = CU_register_suites(suites);
+
+      如果在任何一个suite或者test注册过程中出现错误，则返回一个错误代码。 这些
+	  错误代码和通常的suite注册或test添加操作返回的错误代码一致。 如果要将多个
+	  CU_SuiteInfo数组在一个语句里进行注册，则使用函数CU_register_nsuites()：
+
+	     CU_ErrorCode error = CU_register_nsuites(2, suites1, suites2);
+
+	  该函数接受可变数目的CU_SuiteInfo数组作为参数。第一个参数表示了实际被传入
+	  的数组个数。
+
+  - 4.5. Deprecated v1 Data Types & Functions
+    下面的数据类型和函数是版本2不推荐的。 必须使用USE_DEPRECATED_CUNIT_NAMES宏
+	进行编译才能使用。
+
+    #include <CUnit/TestDB.h> (自动被<CUnit/CUnit.h>包含)
+	--------------------------------------------------------------------------
+	Deprecated Name                  Equivalent New Name
+	TestFunc                         CU_TestFunc
+	InitializeFunc                   CU_InitializeFunc
+	CleanupFunc                      CU_CleanupFunc
+	_TestCase                        CU_Test
+	PTestCase                        CU_pTest
+	_TestGroup                       CU_Suite
+	PTestGroup                       CU_pSuite
+	add_test_group()                 CU_add_suite()
+	add_test_case()                  CU_add_test()
+	ADD_TEST_TO_GROUP()              CU_ADD_TEST()
+	test_case_t                      CU_TestInfo
+	test_group_t                     CU_SuiteInfo
+	test_suite_t                     没有等价用法，使用CU_SuiteInfo
+	TEST_CASE_NULL                   CU_TEST_INFO_NULL
+	TEST_GROUP_NULL                  CU_SUITE_INFO_NULL
+	test_group_register              CU_register_suites()
+	test_suite_register              没有等价用法，使用CU_register_suites()
+
+------------------------------------------------------------------------------
+- 5. Running Tests
+  - 5.1. Synopsis
+    #include <CUnit/Automated.h>
+
+      void          CU_automated_run_tests(void);
+	  CU_ErrorCode  CU_list_tests_to_file(void);
+	  void          CU_set_output_filename(const char* szFilenameRoot);
+
+    #include <CUnit/Basic.h>
+
+	  typedef enum    CU_BasicRunMode
+	  CU_ErrorCode    CU_basic_run_tests(void);
+	  CU_ErrorCode    CU_basic_run_suite(CU_pSuite pSuite);
+      CU_ErrorCode    CU_basic_run_test(CU_pSuite pSuite, CU_pTest pTest);
+	  void            CU_basic_set_mode(CU_BasicRunMode mode);
+	  CU_BasicRunMode CU_basic_get_mode(void);
+	  void            CU_basic_show_failures(CU_pFailureRecord pFailure);
+
+	#include <CUnit/Console.h>
+
+	  void CU_console_run_tests(void);
+
+    #include <CUnit/CUCurses.h>
+
+	  void CU_curses_run_tests(void);
+
+    #include <CUnit/TestRun.h>   (自动被<CUnit/CUnit.h>包含)
+
+	  unsigned int CU_get_number_of_suites_run(void);
+	  unsigned int CU_get_number_of_suites_failed(void);
+	  unsigned int CU_get_number_of_tests_run(void);
+	  unsigned int CU_get_number_of_tests_failed(void);
+      unsigned int CU_get_number_of_asserts(void);
+      unsigned int CU_get_number_of_successes(void);
+	  unsigned int CU_get_number_of_failures(void);
+
+	  typedef struct CU_RunSummary
+	  typedef CU_Runsummary* CU_pRunSummary
+	  const CU_pRumSummary CU_get_run_summary(void);
+
+	  typedef struct CU_FailureRecord
+	  typedef CU_FailureRecord* CU_pFailureRecord
+	  const CU_pFailureRecord CU_get_failure_list(void);
+	  unsigned int CU_get_number_of_failure_records(void);
+
+  - 5.2. Running Tests in CUnit
+    CUnit支持运行在所有已注册suite中的所有test，但是也可以运行单独的test或者单
+	独的suite。在每次运行中，框架跟踪suite数目、test数目以及断言运行、通过、失
+	败的数目。注意，在每次测试运行初始化时会清空上次的结果。
+
+	虽然CUnit提供了许多原始函数用于运行suite和test，大多数使用者希望使用一个简
+	化的用户接口。这些用户接口负责处理和框架的交互细节，并且将测试细节和结果的
+	输出提供给使用者。
+
+	CUnit库包含的接口如下所示：
+
+	--------------------------------------------------------------------------
+	  接口        平台           描述
+	  Automatd    所有           非交互式，输出到xml文件
+	  Basic       所有           非交互式，可选输出到标准输出
+	  Console     所有           控制台交互模式
+	  Curses      Linux/Unix     curses的交互模式
+
+    如果这些接口还不够的话， 客户端可以使用定义在<CUnit/TestRun.h>中的框架提供
+	的原始API。可以查看源码，了解如何直接和原始API进行交互。
+
+  - 5.3 Automated Mode
+    automated接口是非交互式的。客户端启动一次测试，然后结果被输出到一个XML文件
+	里。已注册的test和suite列表也可在XML文件中看到。
+
+	如下所示的函数构成了automated接口API：
+
+	- void CU_automated_run_tests(void)
+
+	  运行所有已注册suite中的test。 测试结果被输出到一个名为ROOT-Results.xml的
+	  文件中。文件名ROOT可以使用CU_set_output_filename()进行设置，否则将使用默
+	  认的文件名CUnitAutomated-Results.xml。注意，如果每次运行前没有设置不同的
+	  ROOT文件名的话，结果文件会被覆盖掉。
+
+	  结果文件可以被DTD文件(CUnit-Run.dtd)和XSL文件(CUnit-Run.xsl)支持。它们可
+	  以在源码和安装树下的Share子目录中找到。
+
+	- CU_ErrorCode CU_list_tests_to_file(void)
+
+	  列出已注册的suite以及对应的test，并输出到文件中。 结果输出到的列表文件名
+	  字为ROOT-Listing.xml。文件名中的ROOT可以使用CU_set_output_filename()进行
+	  设置，否则使用默认值CUnitAutomated。注意，每次运行前没有设置不同的ROOT文
+	  件名的话，列表文件会被覆盖掉。
+
+	  列表文件可以被DTD文件(CUnit-List.dtd)和XSL文件(CUnit-List.xsl)支持。它们
+	  可以在源码和安装树下的Share子目录中找到。
+
+	  还需要注意的是，列表文件不会由CU_automated_run_tests()自动生成。客户端需
+	  要显式地进行请求调用。
+
+	- void CU_set_output_filename(const char* szFilenameRoot)
+
+	  设置结果文件和列表文件的输出文件名。szFilenameRoot被用于替换掉-Results.x
+	  ml和-Listing.xml里的相应位置。
+
+  - 5.4. Basic Mode
+    basic接口同样是一个非交互式接口，结果输出到标准输出stdout。 这个接口支持运
+	行单个的suite或test，并允许客户端代码在每次运行时控制显示输出的类型。 该接
+	口为想要简化CUnit API调用的客户端提供了最大的灵活度。
+
+	提供了如下所示的公共函数：
+
+	- CU_ErrorCode CU_basic_run_tests(void)
+
+	  运行所有已注册的suite中的所有test。 返回值为该次测试运行中出现的第一个错
+	  误代码。输出类型由当前运行模式控制，可通过CU_basic_set_mode()进行设置。
+
+	- CU_ErrorCode CU_basic_run_suite(CU_pSuite pSuite)
+
+	  运行指定的单个suite中的所有test。 返回值为该次测试运行中出现的第一个错误
+	  代码。输出类型由当前运行模式控制，可通过CU_basic_set_mode()进行设置。
+
+    - CU_ErrorCode CU_basic_run_test(CU_pSuite pSuite, CU_pTest pTest)
+	 
+	  运行指定的suite中的指定的单个test。 返回值为该次测试运行中出现的第一个错
+	  误代码。输出类型由当前运行模式控制，可通过CU_basic_set_mode()进行设置。
+
+	- void CU_basic_set_mode(CU_BasicRunMode mode)
+
+	  设置basic运行的模式，以控制测试运行时的输出。可选项为：
+	    
+	    CU_BRM_NORMAL     打印失败和运行总结
+		CU_BRM_SILENT     只打印错误信息
+		CU_BRM_VERBOSE    打印运行的所有细节信息
+
+    - CU_BasicRunMode CU_basic_get_mode(void)
+
+	  获得当前basic运行模式的代码。
+
+	- void CU_basic_show_failures(CU_pFailureRecord pFailure)
+	  
+	  打印所有失败的一个总结到stdout。和运行的模式无关。
+
+  - 5.5. Interactive Console Mode
+    console接口是交互式的。客户端需要做的是启动console会话，然后由使用者交互地
+	控制测试的运行。这包括选择和运行已注册的suite和test，以及查看测试结果。 要
+	启动一个console会话，使用：
+	  
+	  void CU_console_run_tests(void)
+
+  - 5.6. Interactive Curses Mode
+    curses接口是交互式的。客户端需要做的是启动curses会话，然后由用户交互地控制
+	测试的运行。这包括选择和运行已注册的suite和test，以及查看测试结果。 使用该
+	接口需要应用程序链接ncurses库。要启动一个curses会话，使用：
+	  
+	  void CU_curses_run_tests(void)
+
+  - 5.7. Getting Test Results
+    接口直接呈现了测试运行的结果，但是客户端代码可能有时需要直接处理这些结果。
+	这些结果包括不同的统计，以及一个失败记录链表，每个记录存有失败的细节信息。
+	注意，当一个新的测试运行开始时，或者registry初始化或清理掉时，测试结果都会
+	被覆盖掉。
+
+	用于处理测试结果的函数如下：
+
+	- unsigned int CU_get_number_of_suites_run(void)
+	- unsigned int CU_get_number_of_suites_failed(void)
+	- unsigned int CU_get_number_of_tests_run(void)
+	- unsigned int CU_get_number_of_tests_failed(void)
+    - unsigned int CU_get_number_of_asserts(void)
+    - unsigned int CU_get_number_of_successes(void)
+	- unsigned int CU_get_number_of_failures(void)
+	 
+	  这些函数能获得在上次运行中运行的或失败了的suite、test和断言的数目。 如果
+	  suite的初始化函数或者清理函数返回非NULL值，则该suite被认为是失败的。而一
+	  个test的任一个断言失败，则该test被认为失败。最后三个函数指向不同类型的断
+	  言。
+
+	  为了获得已注册的suite和test的总数，可以调用CU_get_registry()->uiNumberO-
+	  fSuites和CU_get_registry()->uiNumberOfTests分别获得。
+
+	- const CU_pRunSummary CU_get_run_summary(void)
+
+	  一次性获得所有测试结果统计。返回值是指向存有统计信息的结构体的指针。该数
+	  据类型定义在<CUnit/TestRun.h>(自动被<CUnit/CUnit.h>包含)：
+
+	    typedef struct CU_RunSummary
+        {
+			unsigned int nSuitesRun;
+			unsigned int nSUitesFailed;
+			unsigned int nTestRun;
+			unsigned int nTestsFailed;
+			unsigned int nAsserts;
+			unsigned int nAssertsFailed;
+			unsigned int nFailureRecords;
+		} CU_RunSummary;
+
+        typedef CU_Runsummary* CU_pRunSummary;
+
+	  返回的指针指向的结构体变量是由框架所拥有，因此使用者不应该去释放或者修改
+	  它。注意，该指针可能在一次新测试开始之后无效。
+
+	- const CU_pFailureRecord CU_get_failure_list(void)
+	 
+	  获得一个链表，记录了上次测试中出现的错误(如果返回NULL表示没有错误发生)。
+	  返回值的数据类型在<CUnit/TestRun.h>(自动被<CUnit/CUnit.h>包含)声明。每个
+	  错误记录包含了错误的位置和性质信息：
+
+	    typedef struct CU_FailureRecord
+		{
+			unsigned int uiLineNumber;
+			char*        strFileName;
+			char*        strCondition;
+			CU_pTest     pTest;
+			CU_pSuite    pSuite;
+
+			struct CU_FailureRecord* pNext;
+			struct CU_FailureRecord* pPrev;
+		} CU_FailureRecord;
+
+        typedef CU_FailureRercord* CU_pFialureRecord;
+
+      返回的指针指向的结构体变量由框架维护，因此使用者不应该释放或者修改这些变
+	  量。注意，该指针可能在一次新测试开始之后无效。
+
+	- unsigned int CU_get_number_of_failure_records(void)
+
+	  获得由CU_get_failure_list()取得的错误记录链表中CU_FailureRecords结构体的
+	  数目。 注意，该数目可能大于错误断言的数目，因为suite的初始化和清理错误也
+	  包括在内。
+
+  - 5.8. Deprecated v1 Data Types & Functions
+    下面的数据类型和函数是版本2不推荐的。 必须使用USE_DEPRECATED_CUNIT_NAMES宏
+	进行编译才能使用。
+
+	--------------------------------------------------------------------------
+	Deprecated Name            Equivalent New Name
+	automated_run_tests()      CU_automated_run_tests() 和
+	                           CU_list_tests_to_file()
+	set_output_filename()      CU_set_output_filename()
+	console_run_tests()        CU_console_run_tests()
+	curses_run_tests()         CU_curses_run_tests()
+
+------------------------------------------------------------------------------
+- 6. Error Handing
+  - 6.1. Synopsis
+    #include<CUnit/CUError.h>  (自动被<CUnit/CUnit.h>包含)
+
+      typedef enum CU_ErrorCode
+	  CU_ErrorCode CU_get_error(void);
+	  const char*  CU_get_error_msg(void);
+
+	  typedef enum   CU_ErrorAction
+	  void           CU_set_error_action(CU_ErrorAction action);
+	  CU_ErrorAction CU_get_error_action(void);
+
+  - 6.2. CUnit Error Handing
+    大多数CUnit函数会设置错误代码来指示框架的错误状态。 一些函数返回该代码，而
+	其他会设置该代码却返回其他值。提供了两个函数来检查框架的错误状态：
+
+	  CU_ErrorCode CU_get_error(void)
+	  const char* CU_get_error_msg(void)
+
+	第一个函数返回错误代码本身，然后第二个则返回描述该错误状态的信息字符串。错
+	误代码(error code)是CU_ErrorCode类型，为enum类型， 定义在<CUnit/CUError.h>
+	中。下面是错误代码的值：
+
+	  ------------------------------------------------------------------------
+	  Error Value            Description
+	  CUE_SUCCESS            没有错误
+	  CUE_NOMEMORY           内存分配失败
+	  CUE_NOREGISTRY         registry没有初始化
+	  CUE_REGISTRY_EXISTS    没有CU_cleanup_registry()就直接CU_set_registry()
+	  CUE_NOSUITE            需要的CU_pSuite指针为NULL
+      CUE_NO_SUITENAME       需要的CU_Suite的名字没有提供
+	  CUE_SINIT_FAILED       Suite初始化失败
+	  CUE_SCLEAN_FAILED      Suite清理失败
+	  CUE_DUP_SUITE          suite的名字有重复
+	  CUE_NOTEST             需要的CU_pTest指针为NULL
+	  CUE_NO_TESTNAME        需要的CU_Test名字为空
+	  CUE_DUP_TEST           test的名字有重复
+	  CUE_TEST_NOT_IN_SUITE  test没有被注册到指定的suite中
+	  CUE_FOPEN_FAILED       打开文件时出现错误
+	  CUE_FCLOSE_FAILED      关闭文件时出现错误
+	  CUE_BAD_FILENAME       请求的是一个坏的文件名(例如NULL, 空，不存在等)
+	  CUE_WRITE_ERROR        在写文件时出现错误
+
+  - 6.3. Behavior Upon Framework Errors
+    当错误条件出现时，默认的行为是设置好错误代码，然后继续执行。有时客户端可能
+	想要在框架的错误发生时停止本次测试的运行，或者退出测试程序。这是可以由使用
+	者进行设置的，通过以下所提供的函数：
+
+	  void CU_set_error_action(CU_ErrorAction action)
+	  CU_ErrorAction CU_get_error_action(void)
+
+	错误动作代码(error action code)是定义在<CUnit/CUError.h>中的枚举类型。有如
+	下所示的值：
+
+	  ------------------------------------------------------------------------
+	  Error Value       Description
+	  CUEA_IGNORE       当错误条件产生时继续运行(默认值)
+	  CUEA_FAIL         当错误条件产生时停止运行
+	  CUEA_ABORT        当错误条件产生时程序调用exit()退出
+
+  - 6.4. Deprecated v1 Variables & Functions
+    下面的数据类型和函数是版本2不推荐的。 必须使用USE_DEPRECATED_CUNIT_NAMES宏
+	进行编译才能使用。
+
+	--------------------------------------------------------------------------
+	Deprecated Name            Equivalent New Name
+	get_error()                CU_get_error_msg()
+	error_code                 没有，使用CU_get_error()
